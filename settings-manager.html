@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Settings - Agentic Flow</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0e1a;
+            color: #f9fafb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background: #1a2332;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+            padding: 2rem;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        h1 {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        .info {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 1.5rem 0;
+            text-align: left;
+        }
+
+        .info strong {
+            color: #6366f1;
+        }
+
+        button {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            margin: 0.5rem;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+        }
+
+        button.secondary {
+            background: #374151;
+        }
+
+        #status {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            display: none;
+        }
+
+        #status.success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #10b981;
+            display: block;
+        }
+
+        #status.error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+            display: block;
+        }
+
+        .current-settings {
+            background: #111827;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔧 Settings Manager</h1>
+        <p>Manage your Agentic Flow frontend settings</p>
+
+        <div class="info">
+            <strong>Current Settings:</strong>
+            <div class="current-settings" id="currentSettings">Loading...</div>
+        </div>
+
+        <div class="info">
+            <strong>⚠️ Note:</strong> The frontend code now uses port <strong>8001</strong> by default.
+            If you're seeing port 8000, it's because old settings are saved in your browser.
+        </div>
+
+        <button onclick="clearSettings()">Clear Saved Settings</button>
+        <button class="secondary" onclick="setPort8001()">Force Set to Port 8001</button>
+        <button class="secondary" onclick="window.location.href='index.html'">Go to App</button>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+        function displayCurrentSettings() {
+            const saved = localStorage.getItem('agenticFlowSettings');
+            const settingsDiv = document.getElementById('currentSettings');
+
+            if (saved) {
+                try {
+                    const settings = JSON.parse(saved);
+                    settingsDiv.innerHTML = `
+                        <div>API Endpoint: <strong>${settings.apiEndpoint || 'Not set'}</strong></div>
+                        <div>Auto Approve: ${settings.autoApprove ? 'Yes' : 'No'}</div>
+                        <div>Show Timestamps: ${settings.showTimestamps ? 'Yes' : 'No'}</div>
+                    `;
+                } catch (e) {
+                    settingsDiv.textContent = 'Error parsing settings';
+                }
+            } else {
+                settingsDiv.innerHTML = '<div>No saved settings (will use defaults)</div>';
+            }
+        }
+
+        function clearSettings() {
+            localStorage.removeItem('agenticFlowSettings');
+            showStatus('Settings cleared! The app will now use default port 8001.', 'success');
+            displayCurrentSettings();
+        }
+
+        function setPort8001() {
+            const settings = {
+                apiEndpoint: 'http://localhost:8001',
+                autoApprove: false,
+                showTimestamps: true
+            };
+            localStorage.setItem('agenticFlowSettings', JSON.stringify(settings));
+            showStatus('Settings updated to use port 8001!', 'success');
+            displayCurrentSettings();
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = type;
+
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Display current settings on load
+        displayCurrentSettings();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,10 @@
+fastapi==0.115.5
+uvicorn==0.32.1
+pydantic==2.10.3
+langgraph
+langchain
+langchain-openai
+langchain-mcp-adapters
+mcp
+httpx
+aiosqlite

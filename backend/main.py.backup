@@ -1,0 +1,371 @@
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import json
+import asyncio
+from typing import Optional
+import random
+
+app = FastAPI(title="Agentic Flow Backend", version="1.0.0")
+
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# In-memory session storage
+sessions = {}
+
+class ChatRequest(BaseModel):
+    message: str
+    session_id: str
+
+class ApprovalRequest(BaseModel):
+    session_id: str
+    approved: bool
+
+# Dummy tools and their simulated behaviors
+DUMMY_TOOLS = [
+    {
+        "name": "browser_navigate",
+        "description": "Navigate to a URL",
+        "duration": 2,
+        "success_rate": 0.95
+    },
+    {
+        "name": "browser_click",
+        "description": "Click an element",
+        "duration": 1,
+        "success_rate": 0.9
+    },
+    {
+        "name": "browser_type",
+        "description": "Type text into an input",
+        "duration": 1.5,
+        "success_rate": 0.95
+    },
+    {
+        "name": "browser_screenshot",
+        "description": "Take a screenshot",
+        "duration": 0.5,
+        "success_rate": 1.0
+    },
+    {
+        "name": "browser_scroll",
+        "description": "Scroll the page",
+        "duration": 0.5,
+        "success_rate": 1.0
+    },
+    {
+        "name": "search_web",
+        "description": "Search the web",
+        "duration": 2,
+        "success_rate": 0.95
+    }
+]
+
+def generate_plan(message: str):
+    """Generate a dummy plan based on the user message"""
+    message_lower = message.lower()
+    
+    if "amazon" in message_lower:
+        return {
+            "steps": [
+                {
+                    "title": "Navigate to Amazon",
+                    "description": "Open browser and navigate to amazon.com",
+                    "action": "browser_navigate",
+                    "params": {"url": "https://amazon.com"}
+                },
+                {
+                    "title": "Take Screenshot",
+                    "description": "Capture the Amazon homepage",
+                    "action": "browser_screenshot",
+                    "params": {}
+                },
+                {
+                    "title": "Search for Product",
+                    "description": "Search for the requested product",
+                    "action": "browser_type",
+                    "params": {"text": "laptop"}
+                }
+            ]
+        }
+    elif "google" in message_lower or "search" in message_lower:
+        return {
+            "steps": [
+                {
+                    "title": "Navigate to Google",
+                    "description": "Open browser and navigate to google.com",
+                    "action": "browser_navigate",
+                    "params": {"url": "https://google.com"}
+                },
+                {
+                    "title": "Perform Search",
+                    "description": "Search for the query",
+                    "action": "search_web",
+                    "params": {"query": message}
+                },
+                {
+                    "title": "Take Screenshot",
+                    "description": "Capture the search results",
+                    "action": "browser_screenshot",
+                    "params": {}
+                }
+            ]
+        }
+    else:
+        # Generic plan
+        return {
+            "steps": [
+                {
+                    "title": "Analyze Request",
+                    "description": "Understanding the user's request",
+                    "action": "analyze",
+                    "params": {"message": message}
+                },
+                {
+                    "title": "Execute Action",
+                    "description": "Performing the requested action",
+                    "action": "execute",
+                    "params": {}
+                },
+                {
+                    "title": "Generate Response",
+                    "description": "Preparing the final response",
+                    "action": "respond",
+                    "params": {}
+                }
+            ]
+        }
+
+async def execute_tool(tool_name: str, params: dict):
+    """Simulate tool execution"""
+    # Find the tool
+    tool = next((t for t in DUMMY_TOOLS if t["name"] == tool_name), None)
+    
+    if not tool:
+        # Generic tool execution
+        duration = random.uniform(0.5, 2.0)
+        success_rate = 0.9
+    else:
+        duration = tool["duration"]
+        success_rate = tool["success_rate"]
+    
+    # Simulate execution time
+    await asyncio.sleep(duration)
+    
+    # Simulate success/failure
+    success = random.random() < success_rate
+    
+    if success:
+        # Generate dummy output based on tool
+        if "navigate" in tool_name:
+            return {
+                "success": True,
+                "url": params.get("url", "https://example.com"),
+                "status_code": 200,
+                "title": "Example Page"
+            }
+        elif "screenshot" in tool_name:
+            # Generate a simple base64 placeholder image
+            return {
+                "success": True,
+                "screenshot": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iIzFhMjMzMiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5TY3JlZW5zaG90IFBsYWNlaG9sZGVyPC90ZXh0Pjwvc3ZnPg==",
+                "timestamp": asyncio.get_event_loop().time()
+            }
+        elif "click" in tool_name:
+            return {
+                "success": True,
+                "element": params.get("selector", "button"),
+                "clicked": True
+            }
+        elif "type" in tool_name:
+            return {
+                "success": True,
+                "text": params.get("text", ""),
+                "typed": True
+            }
+        elif "search" in tool_name:
+            return {
+                "success": True,
+                "query": params.get("query", ""),
+                "results_count": random.randint(5, 20)
+            }
+        else:
+            return {
+                "success": True,
+                "result": "Operation completed successfully"
+            }
+    else:
+        return None  # Will trigger error handling
+
+async def chat_stream(message: str, session_id: str):
+    """Generate streaming chat response"""
+    
+    # Initialize session if needed
+    if session_id not in sessions:
+        sessions[session_id] = {
+            "messages": [],
+            "plan": None,
+            "plan_approved": False
+        }
+    
+    session = sessions[session_id]
+    session["messages"].append({"role": "user", "content": message})
+    
+    # Step 1: Generate and send plan
+    plan = generate_plan(message)
+    session["plan"] = plan
+    session["plan_approved"] = False
+    
+    yield f"data: {json.dumps({'type': 'plan', 'data': plan})}\n\n"
+    
+    # Wait for plan approval (with timeout)
+    max_wait = 30  # 30 seconds timeout
+    wait_time = 0
+    while not session["plan_approved"] and wait_time < max_wait:
+        await asyncio.sleep(0.5)
+        wait_time += 0.5
+    
+    if not session["plan_approved"]:
+        yield f"data: {json.dumps({'type': 'error', 'data': {'message': 'Plan approval timeout'}})}\n\n"
+        yield "data: [DONE]\n\n"
+        return
+    
+    # Step 2: Execute plan steps
+    for i, step in enumerate(plan["steps"]):
+        # Send tool start event
+        tool_start = {
+            "type": "tool_start",
+            "data": {
+                "tool_name": step["action"],
+                "input": step["params"],
+                "step_index": i
+            }
+        }
+        yield f"data: {json.dumps(tool_start)}\n\n"
+        
+        # Execute the tool
+        try:
+            result = await execute_tool(step["action"], step["params"])
+            
+            if result is None:
+                # Tool failed
+                tool_end = {
+                    "type": "tool_end",
+                    "data": {
+                        "tool_name": step["action"],
+                        "output": None,
+                        "error": f"Failed to execute {step['action']}",
+                        "step_index": i
+                    }
+                }
+            else:
+                # Tool succeeded
+                tool_end = {
+                    "type": "tool_end",
+                    "data": {
+                        "tool_name": step["action"],
+                        "output": result,
+                        "error": None,
+                        "step_index": i
+                    }
+                }
+            
+            yield f"data: {json.dumps(tool_end)}\n\n"
+            
+        except Exception as e:
+            # Handle unexpected errors
+            tool_end = {
+                "type": "tool_end",
+                "data": {
+                    "tool_name": step["action"],
+                    "output": None,
+                    "error": str(e),
+                    "step_index": i
+                }
+            }
+            yield f"data: {json.dumps(tool_end)}\n\n"
+        
+        # Small delay between tools
+        await asyncio.sleep(0.3)
+    
+    # Step 3: Send final message
+    final_message = {
+        "type": "message",
+        "data": {
+            "content": f"✅ Successfully completed all {len(plan['steps'])} steps! Your request has been processed."
+        }
+    }
+    yield f"data: {json.dumps(final_message)}\n\n"
+    
+    # Mark as done
+    yield "data: [DONE]\n\n"
+
+@app.post("/chat")
+async def chat(request: ChatRequest):
+    """Chat endpoint with streaming response"""
+    return StreamingResponse(
+        chat_stream(request.message, request.session_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+
+@app.post("/approve-plan")
+async def approve_plan(request: ApprovalRequest):
+    """Handle plan approval/rejection"""
+    if request.session_id not in sessions:
+        return {"status": "error", "message": "Session not found"}
+    
+    session = sessions[request.session_id]
+    
+    if request.approved:
+        session["plan_approved"] = True
+        return {
+            "status": "approved",
+            "message": "Plan approved and executing"
+        }
+    else:
+        session["plan_approved"] = False
+        session["plan"] = None
+        return {
+            "status": "rejected",
+            "message": "Plan rejected"
+        }
+
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "name": "Agentic Flow Backend",
+        "version": "1.0.0",
+        "status": "running",
+        "endpoints": {
+            "chat": "/chat",
+            "approve_plan": "/approve-plan"
+        }
+    }
+
+@app.get("/health")
+async def health():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "sessions": len(sessions)
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    print("🚀 Starting Agentic Flow Backend...")
+    print("📡 Server running at: http://localhost:8001")
+    print("📚 API docs at: http://localhost:8001/docs")
+    uvicorn.run(app, host="0.0.0.0", port=8001)
