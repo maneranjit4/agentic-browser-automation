@@ -151,21 +151,37 @@ async def chat_stream(message: str, session_id: str):
                                         # Extract the file path from the Playwright MCP output
                                         # Format: "### Result\nTook the viewport screenshot and saved it as C:\...\screenshot_1.png\n..."
                                         import re
-                                        path_match = re.search(r'saved it as ([^\n]+\.png)', screenshot_text)
                                         
-                                        if path_match:
-                                            screenshot_path = path_match.group(1).strip()
+                                        # Look for the specific filename pattern we requested
+                                        # We know it should end with session_id/screenshot_*.png
+                                        # But regex on full path is safer.
+
+                                        # If the tool output is just the path (some implementations might do that)
+                                        if screenshot_text.strip().endswith(".png") and len(screenshot_text.split('\n')) == 1:
+                                             path_match_str = screenshot_text.strip()
+                                        else:
+                                             match = re.search(r'(?:saved it as|path:) ([^\n]+\.png)', screenshot_text, re.IGNORECASE)
+                                             path_match_str = match.group(1).strip() if match else None
+
+                                        if path_match_str:
+                                            screenshot_path = path_match_str
                                             # print(f"DEBUG: Extracted screenshot path: {screenshot_path}")
                                             
-                                            # Convert to URL
-                                            if "mcp" in screenshot_path:
-                                                # Split by 'mcp' and take everything after it
-                                                parts = screenshot_path.split("mcp")[-1]
-                                                # Remove leading slashes/backslashes and normalize
-                                                parts = parts.strip("\\/")
-                                                screenshot_url = f"http://localhost:8001/screenshots/{parts.replace(chr(92), '/')}"
-                                                # print(f"DEBUG: Screenshot URL: {screenshot_url}")
-                                                yield f"data: {json.dumps({'type': 'screenshot', 'data': {'url': screenshot_url}})}\n\n"
+                                            # robustly extract relative path based on session_id
+                                            if session_id in screenshot_path:
+                                                 # Extract from session_id onwards
+                                                 idx = screenshot_path.find(session_id)
+                                                 rel_path = screenshot_path[idx:]
+                                                 # Normalize slashes
+                                                 rel_path = rel_path.replace("\\", "/")
+                                                 screenshot_url = f"http://localhost:8001/screenshots/{rel_path}"
+                                                 yield f"data: {json.dumps({'type': 'screenshot', 'data': {'url': screenshot_url}})}\n\n"
+                                            elif "mcp" in screenshot_path:
+                                                 # Fallback to old logic
+                                                 parts = screenshot_path.split("mcp")[-1]
+                                                 parts = parts.strip("\\/")
+                                                 screenshot_url = f"http://localhost:8001/screenshots/{parts.replace(chr(92), '/')}"
+                                                 yield f"data: {json.dumps({'type': 'screenshot', 'data': {'url': screenshot_url}})}\n\n"
  
                                 # 4. Handle LLM Message (optional, for transparency)
                                 # elif kind == "on_chat_model_stream": ...
